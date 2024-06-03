@@ -7,6 +7,7 @@ from scipy.spatial import KDTree
 import json
 import copy
 import sys
+import time
 
 
 hgtd_z_limit = 3400
@@ -118,9 +119,7 @@ def process_athena_csv(input_path,
 
 
 
-
-
-
+# 3/6/24 Checked for overlaps for ITk geometry v3. None found. Can disable by def
     
 def main():
     parser = argparse.ArgumentParser(description="Retrieve the location and ids from the athena and acts geometries.")
@@ -128,8 +127,9 @@ def main():
     parser.add_argument('--input_athena', help="Path to the athena input CSV file")
     parser.add_argument('--hgtd',help="Remove hgtd elements from the parsing",default=False,action="store_true")
     parser.add_argument('--output_json',help="Output json where to store the mapping",default="matched_map.json")
-    parser.add_argument('--kdtree',help="Use K-d tree. The maps of the geometries contain 60k elements. Advise to use", default=False, action="store_true")
+    parser.add_argument('--kdtree',help="Use K-d tree. The maps of the geometries contain 60k elements. Advise to use", default=True, action="store_true")
     parser.add_argument('--tolerance',help="The tolerance for matching elements in the maps in mm. 5 mm seems to match them all",default=5.)
+    parser.add_argument('--checkOverlap',help="Toggle checking if there two elements in the acts map match to the athena map. You can check it only once to save O(n) operations.",default=False, action="store_true")
     
                         
     args = parser.parse_args()
@@ -166,6 +166,12 @@ def main():
     unmatched_map = {}
 
 
+    print("Configuration")
+    print(args)
+
+    # Start time
+    start_time = time.time()
+    
     # Ordinary algorithm looping on all the elements of the maps.
     if not args.kdtree:
     
@@ -206,6 +212,7 @@ def main():
     #Use the k-d tree search algorithm
     else: 
 
+        print("Using K-D tree algorithm")
         # Extract 3D vectors from custom objects
         centers = [obj.center for obj in athena_map.values()]
         
@@ -221,14 +228,26 @@ def main():
             dist, idx = kdtree.query(vec)
             
             if dist < args.tolerance:
+                if args.checkOverlap:
+                    if (key in list(athena_map.keys())):
+                        raise ValueError("The maps have overlapping surfaces")
+                
                 matching_keys.append((key, list(athena_map.keys())[idx]))
             else:
                 non_matching_keys.append([key,value.center])
 
-        
+
+
+    # End time
+    end_time = time.time()
+
+    # Time taken
+    elapsed_time = end_time - start_time
+    print(f"Time taken: {elapsed_time} seconds")
+    
     # Dump data to JSON with indentation
     #json_data = json.dumps(matched_map, indent=4)
-
+    
     # Write JSON data to a file
     #with open(args.output_json, "w") as json_file:
     #    json_file.write(json_data)
