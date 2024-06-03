@@ -201,7 +201,7 @@ def main():
                     continue
 
             if notFound:
-            unmatched_map[acts_key] = value.center
+                unmatched_map[acts_key] = value.center
 
     #Use the k-d tree search algorithm
     else: 
@@ -217,12 +217,13 @@ def main():
         non_matching_keys = []
 
         for key, value in acts_map.items():
-        vec = value.center
-        dist, idx = kdtree.query(vec)
-        if dist < args.tolerance:
-            matching_keys.append((key, list(athena_map.keys())[idx]))
-        else:
-            non_matching_keys.append([key,value.center])
+            vec = value.center
+            dist, idx = kdtree.query(vec)
+            
+            if dist < args.tolerance:
+                matching_keys.append((key, list(athena_map.keys())[idx]))
+            else:
+                non_matching_keys.append([key,value.center])
 
         
     # Dump data to JSON with indentation
