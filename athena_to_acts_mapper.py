@@ -2,9 +2,11 @@ import csv
 import argparse
 
 import numpy as np
+from scipy.spatial import KDTree
 
 import json
 import copy
+import sys
 
 
 hgtd_z_limit = 3400
@@ -114,19 +116,25 @@ def process_athena_csv(input_path,
         return athena_map
 
 
+
+
+
+
+
+    
 def main():
     parser = argparse.ArgumentParser(description="Retrieve the location and ids from the athena and acts geometries.")
     parser.add_argument('--input_acts', help="Path to the acts input CSV file")
     parser.add_argument('--input_athena', help="Path to the athena input CSV file")
     parser.add_argument('--hgtd',help="Remove hgtd elements from the parsing",default=False,action="store_true")
     parser.add_argument('--output_json',help="Output json where to store the mapping",default="matched_map.json")
-    parser.add_argument('--jobs',help="Job pool size")
+    parser.add_argument('--kdtree',help="Use K-d tree. The maps of the geometries contain 60k elements. Advise to use", default=False, action="store_true")
+    parser.add_argument('--tolerance',help="The tolerance for matching elements in the maps in mm. 5 mm seems to match them all",default=5.)
+    
                         
     args = parser.parse_args()
     
     acts_map = process_acts_csv(args.input_acts,args.hgtd)
-
-
 
     print("ACTS MAPPING")
     c = 0
@@ -157,73 +165,79 @@ def main():
     matched_map   = {}
     unmatched_map = {}
 
-    c = 0
-    for acts_key,value in acts_map.items():
 
-        print ("checking entry=",c,value.center)
-        out = []
-        
-        notFound = True
-        c+=1
-
-        
-        acts_loc = value.center
-        
-        for athena_key,value2 in athena_map_copy.items():
-
-            #print(value.center)
-            #print(value2.center)
-
-            if athena_key in skip_dict:
-                continue;
-            
-            if np.linalg.norm(value.center - value2.center) < 10e-3 :
-
-                #Copy the ACTS information into the module info
-                m = copy.deepcopy(value)
-                
-                #Add the ATHENA information
-                m.athena_id  = copy.deepcopy(value2.athena_id)
-                m.athena_ids = copy.deepcopy(value2.athena_ids)
-
-                out = {"acts_id": acts_key,
-                       "athena_id": athena_key,
-                       "athena_ids" : value2.athena_ids}
-                
-                #map it with the athena ID
-                matched_map[int(athena_key,16)] = out
-                skip_dict[athena_key] = True
-                notFound = False
-                continue
-
-        if notFound:
-            unmatched_map[acts_key] = value.center
-                
-        #if (c==10):
-        #    break
-
-    print("Found map")
+    # Ordinary algorithm looping on all the elements of the maps.
+    if not args.kdtree:
     
-    for key,value in matched_map.items():
-        print(key)
-        print(value)
+        c = 0
+        for acts_key,value in acts_map.items():
 
-    print("Not found map")
-    for key,value in  unmatched_map.items():
-        print(key,value)
+            if (c % 100 == 0):
+                print ("checking entry=",c,value.center)
+            out = []
+        
+            notFound = True
+            c+=1
+            acts_loc = value.center
+            
+            for athena_key,value2 in athena_map_copy.items():
 
+                #print(value.center)
+                #print(value2.center)
 
+                if athena_key in skip_dict:
+                    continue;
+            
+                if np.linalg.norm(value.center - value2.center) < args.tolerance :
 
+                    out = {"acts_id": acts_key,
+                           "athena_id": athena_key,
+                           "athena_ids" : value2.athena_ids}
+                
+                    #map it with the athena ID
+                    matched_map[int(athena_key,16)] = out
+                    skip_dict[athena_key] = True
+                    notFound = False
+                    continue
+
+            if notFound:
+            unmatched_map[acts_key] = value.center
+
+    #Use the k-d tree search algorithm
+    else: 
+
+        # Extract 3D vectors from custom objects
+        centers = [obj.center for obj in athena_map.values()]
+        
+        # Construct k-d tree
+        kdtree = KDTree(centers)
+
+        # Find nearest neighbors from dict1 to dict2
+        matching_keys     = []
+        non_matching_keys = []
+
+        for key, value in acts_map.items():
+        vec = value.center
+        dist, idx = kdtree.query(vec)
+        if dist < args.tolerance:
+            matching_keys.append((key, list(athena_map.keys())[idx]))
+        else:
+            non_matching_keys.append([key,value.center])
+
+        
     # Dump data to JSON with indentation
-    json_data = json.dumps(matched_map, indent=4)
+    #json_data = json.dumps(matched_map, indent=4)
 
     # Write JSON data to a file
-    with open(args.output_json, "w") as json_file:
-        json_file.write(json_data)
+    #with open(args.output_json, "w") as json_file:
+    #    json_file.write(json_data)
+    
+    print("Matching keys:", len(matching_keys))
+    print("Non Matching keys", len(non_matching_keys))
 
-
-
-
-
+    for k in non_matching_keys:
+        print(k)
+            
+             
 if __name__=="__main__":
     main()
