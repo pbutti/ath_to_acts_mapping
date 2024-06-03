@@ -244,20 +244,27 @@ def main():
     # Time taken
     elapsed_time = end_time - start_time
     print(f"Time taken: {elapsed_time} seconds")
+
+    matched_map = {}
     
+    for acts_key,athena_key in matching_keys:
+        out = {"acts_id"    : acts_key,
+               "athena_id"  : athena_key,
+               "athena_ids" : athena_map[athena_key].athena_ids}
+        
+        matched_map[int(athena_key,16)] = out
+        
     # Dump data to JSON with indentation
-    #json_data = json.dumps(matched_map, indent=4)
+    json_data = json.dumps(matched_map, indent=4)
     
     # Write JSON data to a file
-    #with open(args.output_json, "w") as json_file:
-    #    json_file.write(json_data)
+    with open(args.output_json, "w") as json_file:
+        json_file.write(json_data)
     
     print("Matching keys:", len(matching_keys))
     print("Non Matching keys", len(non_matching_keys))
 
-    for k in non_matching_keys:
-        print(k)
-            
+                
              
 if __name__=="__main__":
     main()
