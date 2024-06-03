@@ -119,7 +119,8 @@ def main():
     parser.add_argument('--input_acts', help="Path to the acts input CSV file")
     parser.add_argument('--input_athena', help="Path to the athena input CSV file")
     parser.add_argument('--hgtd',help="Remove hgtd elements from the parsing",default=False,action="store_true")
-    
+    parser.add_argument('--output_json',help="Output json where to store the mapping",default="matched_map.json")
+    parser.add_argument('--jobs',help="Job pool size")
                         
     args = parser.parse_args()
     
@@ -217,7 +218,7 @@ def main():
     json_data = json.dumps(matched_map, indent=4)
 
     # Write JSON data to a file
-    with open("mapping.json", "w") as json_file:
+    with open(args.output_json, "w") as json_file:
         json_file.write(json_data)
 
 
